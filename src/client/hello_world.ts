@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/*eslint-disable @typescript-eslint/no-unsafe-assignment /
+/ eslint-disable @typescript-eslint/no-unsafe-member-access */
 
 import {
   Keypair,
@@ -18,9 +18,8 @@ import * as borsh from 'borsh';
 import {getPayer, getRpcUrl, createKeypairFromFile} from './utils';
 import * as BufferLayout from '@solana/buffer-layout';
 import { Buffer } from 'buffer';
-import * as readline from 'readline';
 /**
- * Connection to the networkx
+ * Connection to the network
  */
 let connection: Connection;
 
@@ -54,26 +53,26 @@ const PROGRAM_PATH = path.resolve(__dirname, '../../dist/program');
  *   - `npm run build:program-c`
  *   - `npm run build:program-rust`
  */
-const PROGRAM_SO_PATH = path.join(PROGRAM_PATH, 'helloworld.so');
+const PROGRAM_SO_PATH = path.join(PROGRAM_PATH, 'helloworld_2.so');
 
 /**
  * Path to the keypair of the deployed program.
  * This file is created when running `solana program deploy dist/program/helloworld.so`
  */
-const PROGRAM_KEYPAIR_PATH = path.join(PROGRAM_PATH, 'helloworld-keypair.json');
+const PROGRAM_KEYPAIR_PATH = path.join(PROGRAM_PATH, 'helloworld_2-keypair.json');
 
 /**
  * The state of a greeting account managed by the hello world program
  */
 class GreetingAccount {
-  inputA = 0;
+  inputA = 2;
   inputB = 3;
- // sum=0;
-  constructor(fields: {inputA: number, inputB: number} | undefined = undefined) {
+  sum=0;
+  constructor(fields: {inputA: number, inputB: number, sum: number} | undefined = undefined) {
     if (fields) {
       this.inputA = fields.inputA;
       this.inputB = fields.inputB;
-     // this.sum = fields.sum;
+      this.sum = fields.sum;
     }
   }
 }
@@ -113,18 +112,15 @@ const SECOND_ACCOUNT_SIZE = borsh.serialize(
  * Borsh schema definition for greeting accounts
  */
  const GreetingSchema = new Map([
-  [GreetingAccount, {kind: 'struct', fields: [['inputA', 'u32'], ['inputB', 'u32'] ]}],
+  [GreetingAccount, {kind: 'struct', fields: [['inputA', 'u32'], ['inputB', 'u32'],['sum', 'u32'] ]}],
 ]);
 
 /**
  * The expected size of each greeting account.
  */
-const instructiondata= new GreetingAccount();
-instructiondata.inputA=17;
-instructiondata.inputB=9999;
 const GREETING_SIZE = borsh.serialize(
   GreetingSchema,
-  instructiondata,
+  new GreetingAccount(),
 ).length;
 
 /**
@@ -173,23 +169,6 @@ export async function establishPayer(): Promise<void> {
     'SOL to pay for fees',
   );
 }
-export async function createAccount(seed:any,size:any,lamports:any)
-{
-  const transaction = new Transaction().add(
-    SystemProgram.createAccountWithSeed({
-      fromPubkey: payer.publicKey,
-      basePubkey: payer.publicKey,
-      seed: seed,
-      newAccountPubkey: greetedPubkey,
-      lamports,
-      space: size,
-      programId,
-    }),
-  );
-  await sendAndConfirmTransaction(connection, transaction, [payer]);
-
-};
-
 
 /**
  * Check if the hello world BPF program has been deployed
@@ -249,8 +228,19 @@ console.log('second pubkey',secondPubkey)
     const lamports = await connection.getMinimumBalanceForRentExemption(
       GREETING_SIZE,
     );
-      createAccount(GREETING_SEED,GREETING_SIZE,lamports);
-    
+
+    const transaction = new Transaction().add(
+      SystemProgram.createAccountWithSeed({
+        fromPubkey: payer.publicKey,
+        basePubkey: payer.publicKey,
+        seed: GREETING_SEED,
+        newAccountPubkey: greetedPubkey,
+        lamports,
+        space: GREETING_SIZE,
+        programId,
+      }),
+    );
+    await sendAndConfirmTransaction(connection, transaction, [payer]);
     
   }
 
@@ -259,35 +249,30 @@ console.log('second pubkey',secondPubkey)
   if (secondAccount === null) {
     console.log(
       'Creating second account',
-      secondPubkey.toBase58(),
+      greetedPubkey.toBase58(),
       'to say hello to',
     );
     const lamports = await connection.getMinimumBalanceForRentExemption(
       SECOND_ACCOUNT_SIZE,
     );
 
-    createAccount(SECOND_ACCOUNT_SEED,SECOND_ACCOUNT_SIZE,lamports);
+    const transaction2 = new Transaction().add(
+      SystemProgram.createAccountWithSeed({
+        fromPubkey: payer.publicKey,
+        basePubkey: payer.publicKey,
+        seed: SECOND_ACCOUNT_SEED,
+        newAccountPubkey: secondPubkey,
+        lamports,
+        space: SECOND_ACCOUNT_SIZE,
+        programId,
+      }),
+    );
+    await sendAndConfirmTransaction(connection, transaction2, [payer]);
+    
   }
 }
 
-function createInstructionData(): Buffer {
-
-  // const jsonObject = {
-  //   "A":'29',
-  //   "B":'28',
-  //   "C":'IT'
-  // }
-  const msg = '{"name":"John", "age":"22"}';
-var jsonObj = JSON.parse(msg);
- 
-// convert JSON object to String
-var jsonStr = JSON.stringify(jsonObj);
- 
-// read json string to Buffer
-const buf = Buffer.from(jsonStr);
- 
-// console.log(buf.length);
-
+function createSayHelloInstructionData(): Buffer {
   const dataLayout = BufferLayout.struct([
     BufferLayout.u8('A'),BufferLayout.u8('B')
   ],
@@ -295,37 +280,27 @@ const buf = Buffer.from(jsonStr);
 
   const data = Buffer.alloc(dataLayout.span);
   dataLayout.encode({
-    A: 23,
-    B: 24
+    A: 200,
+    B: 120
   }, data);
 console.log('data:------->', data )
-console.log('buffer data: ', jsonObj);
-  return data ;
+  return data;
 }
+
 
 /**
  * Say hello
  */
 export async function sayHello(): Promise<void> {
-
-
-
-// console.log('Saying hello to', greetedPubkey.toBase58());
-// const instruction = new TransactionInstruction({
-//   keys: [{pubkey: greetedPubkey, isSigner: false, isWritable: true}],
-//   programId,
-//   data: Buffer.from(JSON.stringify({a: 25, b: 36, res: 0}) ), // All instructions are hellos
-// });
+  console.log('Saying hello to', greetedPubkey.toBase58());
   
 const instruction = new TransactionInstruction({
     keys: [{pubkey: greetedPubkey, isSigner: false, isWritable: true},{pubkey: secondPubkey, isSigner: false, isWritable: true}],
     programId,
-    data: Buffer.from(borsh.serialize(
-      GreetingSchema,
-      instructiondata,
-    )), 
+    data: createSayHelloInstructionData(),
+     // All instructions are hellos
   });
-
+  console.log("programId",programId.toBase58())
   await sendAndConfirmTransaction(
     connection,
     new Transaction().add(instruction),
@@ -338,22 +313,22 @@ const instruction = new TransactionInstruction({
  */
 export async function reportGreetings(): Promise<void> {
   const accountInfo = await connection.getAccountInfo(greetedPubkey);
- 
+  console.log("AAAAAAAAAAAA",accountInfo)
   if (accountInfo === null) {
     throw 'Error: cannot find the greeted account';
   }
-  // const greeting = borsh.deserialize(
-  //   GreetingSchema,
-  //   GreetingAccount,
-  //   accountInfo.data,
-  // );
+  const greeting = borsh.deserialize(
+    GreetingSchema,
+    GreetingAccount,
+    accountInfo.data,
+  );
  
-  //console.log("accountinfo", greeting);
+  console.log("accountinfo", greeting);
   console.log(
-    //greetedPubkey.toBase58(),
+    greetedPubkey.toBase58(),
     //'has been greeted',
     'the sum of the two numbers is =>',
-    //greeting.sum,
+    greeting.sum,
     //'time(s)',
   );
 }
