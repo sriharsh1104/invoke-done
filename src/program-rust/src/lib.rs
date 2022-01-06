@@ -1,5 +1,8 @@
 pub mod processor;
 use borsh::{BorshDeserialize, BorshSerialize};
+use std::str::FromStr;
+
+// use solana_program::{pubkey, pubkey::Pubkey};
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
     instruction::{AccountMeta, Instruction},
@@ -7,32 +10,35 @@ use solana_program::{
     entrypoint::ProgramResult,
     msg,
     program_error::ProgramError,
-    pubkey::Pubkey, 
+    pubkey, pubkey::Pubkey, 
     program::invoke
 };
 
 
 mod instruction;
 
+use instruction::initialize_sum_account;
 
-// use std::str;
-// mod instruction;
-// use crate::instruction::HelloInstruction;
+
+
 use core::convert::From;
-// use byteorder::{BigEndian, ReadBytesExt};
 
-/// Define the type of state stored in accounts
+
+
+
+
+
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
-pub struct GreetingAccount {
+pub struct instructiondata {
     /// number of greetings
     pub input_a: u32,
     pub input_b: u32,
-    pub sum: u32,
+    pub program_id: String,
 }
 
 // Declare and export the program's entrypoint
 entrypoint!(process_instruction);
-solana_program::declare_id!("8XN4SLFgTwq48N8uq5p2GAG6kSCWKfLBvKNRuJNTjdVg");
+solana_program::declare_id!("DyAFrm47pSvZbUd5Mv8BgXDnX9wWt2db5TPkk1rzin79");
 
 // Program entrypoint's implementation
 pub fn process_instruction(
@@ -42,75 +48,65 @@ pub fn process_instruction(
      // Ignored, all helloworld instructions are hellos
 ) -> ProgramResult {
     msg!("Hello World Rust program entrypoint");
+     // Increment and store the number of times the account has been greeted
+   let mut greeting_account = instructiondata::try_from_slice(_instruction_data).unwrap();
+   msg!("{:?}",greeting_account);
 //     let keyReceived = String::from_utf8_lossy(_instruction_data);
 //    let instruction = HelloInstruction::unpack(_instruction_data);
 
+let my_id = Pubkey::from_str(&greeting_account.program_id).unwrap();
+msg!("program_id => {:?}",my_id);
+
+//    for i in 0..accounts.len() {
+//     msg!("Account no. {} info: {:?}",i, accounts[i]);
+// }
+//    let (number, program2_id) = _instruction_data.split_at(2);
 
 
-   for i in 0..accounts.len() {
-    msg!("Account no. {} info: {:?}",i, accounts[i]);
-}
-    let number : u32 = From::from(_instruction_data[0]);
-    let number2 :u32 = From::from(_instruction_data[1]);
-   msg!("instruction data :=> {}", number);
+//     let p_id = String::from_utf8_lossy(program2_id);
+//    msg!("instruction data :=> {:?}", _instruction_data);
    //Iterating accounts is safer then indexing
      let accounts_iter = &mut accounts.iter();
     
-   msg!("instruction data {:?}", _instruction_data);
+   //msg!("instruction data {:?}", number2);
     // Get msg!the account to say hello to
-     let account = next_account_info(accounts_iter)?;
-    
-    msg!("account {:?}",account.data );
-    // The account must be owned by the program in order to modify its data
-    if account.owner != program_id {
-        msg!("Greeted account does not have the correct program id");
-        return Err(ProgramError::IncorrectProgramId);
- }
+     let account1 = next_account_info(accounts_iter)?;
 
+    // msg!("instruction data {}", p_id);
+    // Get msg!the account to say hello to
+    // let account = next_account_info(accounts_iter)?;
+    
+    msg!("account {:?}",account1.data );
+
+    // msg!("Greeted {} time(s)!", greeting_account.input_a);
+
+    let acc1 = account1.key;
+    let account2 = next_account_info(accounts_iter)?;
+
+    let acc2 = account2.key; 
+    let mut data: Vec<u8> = Vec::with_capacity(10);
+   
+    let programaccount = next_account_info(accounts_iter)?;
+    
+    // let p_id = solana_program::pubkey::Pubkey::FromStr("G15b24WaZZrZEFLU2JVCpLXZ9fz3cCxrN8yRBgFwGqLM");
+    
+
+//Create_invoke_instruction(&id() , acc1 , acc2 ,data) ;
+  let test = initialize_sum_account(
+         &my_id , acc1 , acc2 
+  );
+msg!("sum account {:?}", test);
+//     );
+
+
+ invoke( &initialize_sum_account(
+    &my_id,
+    acc1,
+    acc2,
+   
+)?, &[account1.clone(), account2.clone(), programaccount.clone()]);
+      
  
 
-   // Increment and store the number of times the account has been greeted
-   let mut greeting_account = GreetingAccount::try_from_slice(&account.data.borrow())?;
-   
-   greeting_account.sum = greeting_account.input_a + greeting_account.input_b;
-   msg!("abc =================================================>{},{},{}", greeting_account.input_a, greeting_account.input_b,greeting_account.sum);
-   let num1= _instruction_data[0];
-   msg!("first number {}",num1);
-
-   greeting_account.input_a =number;
-   greeting_account.input_b =number2;
-   greeting_account.sum = greeting_account.input_a + greeting_account.input_b;
-   greeting_account.serialize(&mut &mut account.data.borrow_mut()[..])?;
-
-    msg!("Greeted {} time(s)!", greeting_account.input_a);
-
-    let acc1 = account.key;
-    let account = next_account_info(accounts_iter)?;
-
-    let acc2 = account.key; 
-    let mut data: Vec<u8> = Vec::with_capacity(10);
-  
-    
-    /*
-    let p_id = solana_program::pubkey::Pubkey::FromStr("8XN4SLFgTwq48N8uq5p2GAG6kSCWKfLBvKNRuJNTjdVg");
-    */
-
- create_invoke_instruction(&id() , acc1 , acc2 ,data) ;
-
     Ok(())
-  }
-  
-  pub fn create_invoke_instruction(program_id: &Pubkey ,acc1: &Pubkey,acc2: &Pubkey,data:Vec<u8>) -> Result<Instruction, ProgramError> {
-    let accounts = vec![
-        AccountMeta::new(*acc1, false),
-        AccountMeta::new(*acc2, false),
-    ];
-
-    msg!("Invoking instruction");
-
-    Ok(Instruction {
-        program_id: *program_id,
-       accounts,
-        data,
-    })
   }

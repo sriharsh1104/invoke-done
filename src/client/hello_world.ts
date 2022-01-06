@@ -123,6 +123,28 @@ const GREETING_SIZE = borsh.serialize(
   new GreetingAccount(),
 ).length;
 
+class instructiondataset {
+  input_a = 0;
+  input_b = 0;
+  program_id = "";
+ constructor(fields: {input_a: number,input_b: number,program_id: string,} | undefined = undefined) 
+ {
+    if (fields) {
+      this.input_a = fields.input_a;
+      this.input_b = fields.input_b;
+      this.program_id = fields.program_id;
+     
+    }
+  }
+}
+
+/**
+ * Borsh schema definition for instruction
+ */
+ const InstructionSchema = new Map([
+  [instructiondataset, {kind: 'struct', fields: [['input_a', 'u32'], ['input_b', 'u32'],['program_id', 'string'] ]}],
+]);
+
 /**
  * Establish a connection to the cluster
  */
@@ -243,9 +265,9 @@ console.log('second pubkey',secondPubkey)
     await sendAndConfirmTransaction(connection, transaction, [payer]);
     
   }
-
   // Check if the greeting account has already been created
   const secondAccount = await connection.getAccountInfo(secondPubkey);
+
   if (secondAccount === null) {
     console.log(
       'Creating second account',
@@ -273,17 +295,25 @@ console.log('second pubkey',secondPubkey)
 }
 
 function createSayHelloInstructionData(): Buffer {
-  const dataLayout = BufferLayout.struct([
-    BufferLayout.u8('A'),BufferLayout.u8('B')
-  ],
-  );
+//   const dataLayout = BufferLayout.struct([
+//     BufferLayout.u8('A'),BufferLayout.u8('B')
+//   ],
+//   );
 
-  const data = Buffer.alloc(dataLayout.span);
-  dataLayout.encode({
-    A: 200,
-    B: 120
-  }, data);
-console.log('data:------->', data )
+//   const data = Buffer.alloc(dataLayout.span);
+//   dataLayout.encode({
+//     A: 200,
+//     B: 120
+//   }, data);
+// console.log('data:------->', data )
+//   return data;
+const instructiondata= new instructiondataset();
+  instructiondata.input_a = 40;
+  instructiondata.input_b = 50;
+  instructiondata.program_id = "DyAFrm47pSvZbUd5Mv8BgXDnX9wWt2db5TPkk1rzin79";
+  const data = Buffer.from(borsh.serialize(InstructionSchema,instructiondata));
+  console.log('buffer data: ', data);
+  console.log(" instructiondata.input_a", instructiondata.input_a)
   return data;
 }
 
@@ -293,9 +323,11 @@ console.log('data:------->', data )
  */
 export async function sayHello(): Promise<void> {
   console.log('Saying hello to', greetedPubkey.toBase58());
-  
+  let program_key = new PublicKey("DyAFrm47pSvZbUd5Mv8BgXDnX9wWt2db5TPkk1rzin79");
+  //const program_account = await connection.getAccountInfo(program_key);
+
 const instruction = new TransactionInstruction({
-    keys: [{pubkey: greetedPubkey, isSigner: false, isWritable: true},{pubkey: secondPubkey, isSigner: false, isWritable: true}],
+    keys: [{pubkey: greetedPubkey, isSigner: false, isWritable: true},{pubkey: secondPubkey, isSigner: false, isWritable: true},{pubkey: program_key, isSigner: false, isWritable: false}],
     programId,
     data: createSayHelloInstructionData(),
      // All instructions are hellos
